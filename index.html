@@ -169,10 +169,13 @@ function drawTrend(secid, name){
 function loadTrendTencent(code){
   return new Promise(function(res,rej){
     var n='mtq_'+Math.random().toString(36).slice(2);
-    var t=setTimeout(function(){ delete window[n]; rej('timeout'); },8000);
-    window[n]=function(d){ clearTimeout(t); delete window[n];
+    var sc=document.createElement('script');
+    var t=setTimeout(function(){ cleanup(); rej('timeout'); },8000);
+    function cleanup(){ clearTimeout(t); if(sc.parentNode) sc.parentNode.removeChild(sc); }
+    sc.onload=function(){ cleanup();
       try{
-        var x=d.data[code]; var rows=x.data.data; var qt=x.qt[code]; var pre=+qt[4];
+        var obj=window[n]; delete window[n];
+        var x=obj.data[code]; var rows=x.data.data; var qt=x.qt[code]; var pre=+qt[4];
         var times=[],prices=[],vols=[],cumV=0;
         rows.forEach(function(r){ var p=r.split(' ');
           times.push(p[0].slice(0,2)+':'+p[0].slice(2)); prices.push(+p[1]);
@@ -181,9 +184,8 @@ function loadTrendTencent(code){
         res({times:times,prices:prices,vols:vols,pre:pre});
       }catch(e){ rej('parse'); }
     };
-    var sc=document.createElement('script');
-    sc.src='https://web.ifzq.gtimg.cn/appstock/app/minute/query?_var='+n+'&code='+code+'&_='+Date.now();
-    sc.onerror=function(){ clearTimeout(t); delete window[n]; rej('net'); };
+    sc.onerror=function(){ cleanup(); delete window[n]; rej('net'); };
+    sc.src='https://web.ifzq.gtimg.cn/appstock/app/minute/query?_var='+n+'&code='+code;
     document.head.appendChild(sc);
   });
 }
@@ -232,7 +234,7 @@ function tickBoards(){
       yAxis:{type:'category',data:names,axisLabel:{fontSize:11}},
       series:[{type:'bar',data:vals.map(function(v,i){return {value:v,itemStyle:{color:colors[i],borderRadius:3}};}),barMaxWidth:14,label:{show:true,position:'right',fontSize:10,formatter:function(p){return Number(p.value).toFixed(1);}}}]
     },true);
-  }).catch(function(){});
+  }).catch(function(){ if(!charts.board){ $('boardBox').innerHTML='<div class="degrade">板块数据源受限（东财接口），手机或关闭代理可见</div>'; } });
 }
 
 /* ===== 市场宽度 ===== */
@@ -249,7 +251,7 @@ function tickBreadth(){
         data:[ {name:'上涨',value:up,itemStyle:{color:'#d0342c'}}, {name:'下跌',value:dn,itemStyle:{color:'#1e8e5a'}}, {name:'平盘',value:fl,itemStyle:{color:'#b9c2d0'}} ]}],
       graphic:[{type:'text',left:'center',top:'40%',style:{text:'涨家占比\n'+(tot?((up/tot)*100).toFixed(0):'-')+'%',textAlign:'center',fill:'#16233f',fontSize:isM?12:14,lineHeight:18}}]
     },true);
-  }).catch(function(){});
+  }).catch(function(){ if(!charts.breadth){ $('breadthBox').innerHTML='<div class="degrade">涨跌数据源受限（东财接口），手机或关闭代理可见</div>'; } });
 }
 
 /* ===== 自选列表 ===== */
