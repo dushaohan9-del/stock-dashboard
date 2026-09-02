@@ -46,8 +46,8 @@
   .grp-body table { font-size:12.5px; }
   .grp-body td { padding:8px 6px; }
   .grp-body th { padding:5px 6px; }
-  .chart-row { display:flex; gap:16px; flex-wrap:wrap; margin-bottom:16px; }
-  .chart-row > .card { flex:1; min-width:340px; margin-bottom:0; }
+  .chart-row { display:grid; grid-template-columns:6fr 4fr; gap:16px; margin-bottom:16px; }
+  .chart-row > .card { margin-bottom:0; }
   .gchip { border:1px solid #d7deea; background:#f7f9fc; color:#445; border-radius:999px; padding:5px 14px; font-size:13px; cursor:pointer; transition:all .2s; }
   .gchip.on { background:#28477e; color:#fff; border-color:#28477e; box-shadow:0 3px 10px rgba(40,71,126,.3); }
   table { width:100%; border-collapse:collapse; font-size:13.5px; }
@@ -63,7 +63,7 @@
   .fadein { animation:rise .45s ease both; }
   .foot { font-size:11.5px; color:#a2aabb; line-height:1.8; margin-top:18px; }
   .degrade { color:#a2aabb; font-size:13px; padding:30px 10px; text-align:center; }
-  @media (max-width:900px) { .idx-row{grid-template-columns:repeat(3,1fr);} .grid2{grid-template-columns:1fr;} .chart{height:280px;} }
+  @media (max-width:900px) { .idx-row{grid-template-columns:repeat(3,1fr);} .grid2{grid-template-columns:1fr;} .chart-row{grid-template-columns:1fr;} .chart{height:280px;} }
   @media (max-width:560px) { .wrap{padding:14px 10px 30px;} .idx-row{grid-template-columns:repeat(2,1fr);} .idx .val{font-size:19px;} .hero{padding:16px;} }
 </style>
 </head>
@@ -98,7 +98,7 @@
   </div>
 
   <div class="chart-row">
-    <div class="card" style="flex:1.2">
+    <div class="card">
       <h2>板块资金榜</h2>
       <div class="cap">优先显示主力净流入（亿元）· 数据源受限时自动切换为板块涨跌幅</div>
       <div id="boardBox" class="chart-s"><div class="degrade">数据加载中…</div></div>
@@ -240,22 +240,24 @@ function renderBoard(names, vals, unit, title){
   },true);
 }
 function tickBoards(){
+  loadScript('https://qt.gtimg.cn/q='+BK31.map(function(b){return b[0];}).join(',')).then(function(){
+    var arr=[];
+    BK31.forEach(function(b){ var v=window['v_'+b[0]]; if(v){ var a=v.split('~'); var z=+a[32]; if(!isNaN(z)) arr.push([b[1], z]); } });
+    if(!arr.length){ throw 'empty'; }
+    arr.sort(function(x,y){ return y[1]-x[1]; });
+    var top=arr.slice(0,5), bot=arr.slice(-5).reverse();
+    var merged=bot.concat(top);
+    renderBoard(merged.map(function(x){return x[0];}), merged.map(function(x){return +x[1].toFixed(2);}), '%', '板块涨跌幅');
+    tickBoardMoney();
+  }).catch(function(){ if(!charts.board){ $('boardBox').innerHTML='<div class="degrade">板块数据暂不可达，下轮自动重试</div>'; } });
+}
+function tickBoardMoney(){
   qs('https://push2.eastmoney.com/api/qt/clist/get?pn=1&pz=10&po=1&np=1&fltt=2&invt=2&fid=f62&fs=m:90+t:2&fields=f14,f62,f3').then(function(d){
-    var diff=d&&d.data&&d.data.diff; if(!diff||!diff.length){ throw 'empty'; }
+    var diff=d&&d.data&&d.data.diff; if(!diff||!diff.length){ return; }
     var names=[],vals=[];
     diff.forEach(function(x){ names.unshift(x.f14); vals.unshift(+((x.f62)/1e8).toFixed(2)); });
     renderBoard(names, vals, '亿元', '主力净流入');
-  }).catch(function(){
-    loadScript('https://qt.gtimg.cn/q='+BK31.map(function(b){return b[0];}).join(',')).then(function(){
-      var arr=[];
-      BK31.forEach(function(b){ var v=window['v_'+b[0]]; if(v){ var a=v.split('~'); arr.push([b[1], +a[24]||0]); } });
-      if(!arr.length){ throw 'empty'; }
-      arr.sort(function(x,y){ return y[1]-x[1]; });
-      var top=arr.slice(0,5), bot=arr.slice(-5).reverse();
-      var merged=bot.concat(top);
-      renderBoard(merged.map(function(x){return x[0];}), merged.map(function(x){return +x[1].toFixed(2);}), '%', '板块涨跌幅');
-    }).catch(function(){ if(!charts.board){ $('boardBox').innerHTML='<div class="degrade">板块数据暂不可达，下轮自动重试</div>'; } });
-  });
+  }).catch(function(){});
 }
 
 /* ===== 市场宽度 ===== */
@@ -275,7 +277,7 @@ function tickBreadth(){
   }).catch(function(){
     loadScript('https://qt.gtimg.cn/q='+BK31.map(function(b){return b[0];}).join(',')).then(function(){
       var up=0,dn=0,fl=0;
-      BK31.forEach(function(b){ var v=window['v_'+b[0]]; if(!v) return; var z=+(v.split('~')[24]||0); if(z>0.005)up++; else if(z<-0.005)dn++; else fl++; });
+      BK31.forEach(function(b){ var v=window['v_'+b[0]]; if(!v) return; var z=+(v.split('~')[32]||0); if(z>0.005)up++; else if(z<-0.005)dn++; else fl++; });
       if(!charts.breadth){ $('breadthBox').innerHTML=''; charts.breadth=echarts.init($('breadthBox')); }
       var isM=window.innerWidth<900;
       charts.breadth.setOption({
