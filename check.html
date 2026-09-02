@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>行情数据源连通性体检 · 最小验证版</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang SC','Microsoft YaHei',sans-serif; background:#f5f7fa; color:#333; }
+  .wrap { max-width:860px; margin:0 auto; padding:36px 24px; }
+  .hero { background:linear-gradient(135deg,#1a2b4c,#2c4a7c); color:#fff; border-radius:14px; padding:26px 28px; margin-bottom:20px; animation:rise .5s ease both; }
+  .hero h1 { font-size:21px; margin-bottom:8px; }
+  .hero p { font-size:13px; opacity:.85; line-height:1.8; }
+  .score { display:flex; align-items:center; gap:10px; background:#fff; border-radius:12px; padding:14px 18px; margin-bottom:18px; box-shadow:0 1px 3px rgba(0,0,0,.06); animation:rise .5s .05s ease both; }
+  .score b { font-size:22px; color:#1a2b4c; }
+  .dot { width:10px; height:10px; border-radius:50%; background:#f0a020; animation:pulse 1.2s infinite; }
+  .dot.ok { background:#2e8b57; animation:none; }
+  .dot.no { background:#b0413e; animation:none; }
+  @keyframes pulse { 0%,100%{box-shadow:0 0 0 0 rgba(240,160,32,.5);} 50%{box-shadow:0 0 0 7px rgba(240,160,32,0);} }
+  @keyframes rise { from{opacity:0; transform:translateY(10px);} to{opacity:1; transform:none;} }
+  .card { background:#fff; border-radius:12px; box-shadow:0 1px 3px rgba(0,0,0,.06); padding:18px 20px; margin-bottom:14px; animation:rise .5s ease both; }
+  .card .head { display:flex; align-items:center; justify-content:space-between; gap:10px; }
+  .card h2 { font-size:15px; color:#1a2b4c; }
+  .pill { font-size:12px; padding:2px 10px; border-radius:999px; color:#fff; white-space:nowrap; }
+  .p-run { background:#f0a020; } .p-ok { background:#2e8b57; } .p-no { background:#b0413e; } .p-warn { background:#8a9bb5; }
+  .card .desc { font-size:12px; color:#999; margin-top:4px; }
+  .card .out { font-size:13px; margin-top:10px; padding:10px 12px; background:#f8fafc; border-radius:8px; line-height:1.8; word-break:break-all; min-height:20px; color:#333; }
+  .card .out.err { color:#b0413e; }
+  .meta { font-size:12px; color:#aaa; margin-top:6px; }
+  .btn { border:1px solid #c9d4e5; background:#fff; color:#2c4a7c; border-radius:8px; padding:3px 12px; font-size:12px; cursor:pointer; }
+  .btn:hover { background:#eef3fa; }
+  .note { background:#fff7f0; border:1px solid #f0d9c0; border-radius:10px; padding:12px 16px; font-size:12.5px; line-height:1.9; color:#8a5a1a; margin-top:16px; }
+  .foot { font-size:11px; color:#aaa; margin-top:14px; line-height:1.7; }
+  @media (max-width:768px){ .wrap{padding:20px 14px;} .hero{padding:18px;} }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="hero">
+    <h1>行情数据源连通性体检</h1>
+    <p>本页面自动测试 5 个公开行情接口能否被浏览器直连，用于确定"全球市场看板"的数据链路方案。<br>页面本身不请求任何私有数据，所有测试均为公开行情接口。</p>
+  </div>
+
+  <div class="score"><span id="gDot" class="dot"></span><span>测试进度：</span><b id="gScore">0 / 5</b><span style="font-size:12px;color:#888" id="gTip">正在自动运行…</span></div>
+
+  <div class="card" style="animation-delay:.08s">
+    <div class="head"><h2>① 腾讯证券 · 指数实时行情</h2><div><span class="pill p-run" id="s1">测试中</span> <button class="btn" onclick="t1()">重试</button></div></div>
+    <div class="desc">script 标签直连，验证上证指数 / 创业板指 / 科创50 能否秒级取数（看板的指数总览模块）</div>
+    <div class="out" id="o1">等待结果…</div>
+  </div>
+
+  <div class="card" style="animation-delay:.14s">
+    <div class="head"><h2>② 东方财富 · 指数明细 JSONP</h2><div><span class="pill p-run" id="s2">测试中</span> <button class="btn" onclick="t2()">重试</button></div></div>
+    <div class="desc">JSONP 方式取上证指数最新价与涨跌幅，验证东财 push2 接口的跨域可用性（看板的核心数据源）</div>
+    <div class="out" id="o2">等待结果…</div>
+  </div>
+
+  <div class="card" style="animation-delay:.2s">
+    <div class="head"><h2>③ 东方财富 · 板块主力净流入榜</h2><div><span class="pill p-run" id="s3">测试中</span> <button class="btn" onclick="t3()">重试</button></div></div>
+    <div class="desc">取行业板块按主力净流入排序前 5，验证"板块与资金"模块数据链路</div>
+    <div class="out" id="o3">等待结果…</div>
+  </div>
+
+  <div class="card" style="animation-delay:.26s">
+    <div class="head"><h2>④ 东方财富 · 个股当日分时序列</h2><div><span class="pill p-run" id="s4">测试中</span> <button class="btn" onclick="t4()">重试</button></div></div>
+    <div class="desc">取贵州茅台今日分钟级分时序列，验证"自选股动态折线图"数据链路</div>
+    <div class="out" id="o4">等待结果…</div>
+  </div>
+
+  <div class="card" style="animation-delay:.32s">
+    <div class="head"><h2>⑤ 财经快讯接口（fetch 跨域）</h2><div><span class="pill p-run" id="s5">测试中</span> <button class="btn" onclick="t5()">重试</button></div></div>
+    <div class="desc">普通 fetch 请求东财 7x24 快讯，此项最依赖"部署后的域名"，本地打开失败属正常，部署后需复测</div>
+    <div class="out" id="o5">等待结果…</div>
+  </div>
+
+  <div class="note">
+    <b>怎么读结果：</b>①-④ 走 script 标签/JSONP，本地双击打开就能测出真实结论；⑤ 走普通跨域请求，本地（file:// 协议）失败不代表上线后失败，部署到网站域名后需重跑本页复测。<br>
+    <b>①-④ 全通过</b> → 看板可做"浏览器自动刷新行情"的真·实时版；<b>有失败项</b> → 对应模块降级为定时快照注入，其余照常。
+  </div>
+  <div class="foot">测试完成时间将显示在顶部。本页为验证版最小实现，无任何账号、无数据上传。</div>
+</div>
+
+<script>
+var done = {}, total = 5;
+function finish(n, ok, msg, warn) {
+  var el = document.getElementById('s' + n), out = document.getElementById('o' + n);
+  el.textContent = warn ? '受限' : (ok ? '通过' : '失败');
+  el.className = 'pill ' + (warn ? 'p-warn' : (ok ? 'p-ok' : 'p-no'));
+  out.textContent = msg;
+  out.className = 'out' + ((ok || warn) ? '' : ' err');
+  if (!(n in done)) { done[n] = warn ? 'w' : (ok ? 1 : 0); }
+  var cnt = Object.keys(done).length;
+  document.getElementById('gScore').textContent = cnt + ' / ' + total;
+  var pass = 0, all = true;
+  for (var k in done) { if (done[k] === 1) pass++; if (done[k] !== 'w' && !done[k]) all = false; }
+  var dot = document.getElementById('gDot');
+  if (cnt >= total) {
+    var core = [done[1], done[2], done[3], done[4]];
+    var coreOk = core.filter(function(v){ return v === 1; }).length;
+    dot.className = 'dot ' + (coreOk >= 3 ? 'ok' : 'no');
+    document.getElementById('gTip').textContent = coreOk >= 3
+      ? '核心行情链路可用（' + coreOk + '/4 通过）' + (done[5] === 'w' ? '；快讯接口待部署后复测' : '')
+      : '核心链路受限，对应模块将改为定时快照';
+    dot.title = '';
+  } else {
+    dot.className = 'dot';
+    document.getElementById('gTip').textContent = '正在自动运行…';
+  }
+}
+function jsonp(url, timeoutMs) {
+  return new Promise(function(res, rej) {
+    var name = 'cbk_' + Math.random().toString(36).slice(2);
+    var timer = setTimeout(function() { cleanup(); rej('超时(' + timeoutMs + 'ms)'); }, timeoutMs);
+    function cleanup() { clearTimeout(timer); delete window[name]; var s = document.getElementById(name); if (s) s.remove(); }
+    window[name] = function(data) { cleanup(); res(data); };
+    var sc = document.createElement('script');
+    sc.id = name;
+    sc.src = url + (url.indexOf('?') >= 0 ? '&' : '?') + 'cb=' + name + '&_=' + Date.now();
+    sc.onerror = function() { cleanup(); rej('脚本加载失败（网络不通或被拦截）'); };
+    document.head.appendChild(sc);
+  });
+}
+function scriptTag(url, timeoutMs) {
+  return new Promise(function(res, rej) {
+    var timer = setTimeout(function() { rej('超时(' + timeoutMs + 'ms)'); }, timeoutMs);
+    var sc = document.createElement('script');
+    sc.charset = 'GBK';
+    sc.src = url + (url.indexOf('?') >= 0 ? '&' : '?') + 't=' + Date.now();
+    sc.onload = function() { clearTimeout(timer); res(); };
+    sc.onerror = function() { clearTimeout(timer); rej('脚本加载失败（网络不通或被拦截）'); };
+    document.head.appendChild(sc);
+  });
+}
+function ms(t0) { return ((performance.now() - t0) / 1000).toFixed(2) + 's'; }
+
+window.t1 = function() {
+  var t0 = performance.now();
+  scriptTag('https://qt.gtimg.cn/q=sh000001,sz399006,sh000688', 6000).then(function() {
+    var rows = [];
+    [['v_sh000001', '上证指数'], ['v_sz399006', '创业板指'], ['v_sh000688', '科创50']].forEach(function(p) {
+      var v = window[p[0]];
+      if (!v) { rows.push(p[1] + ': 变量缺失'); return; }
+      var a = v.split('~');
+      rows.push(p[1] + ' ' + a[3] + '（' + a[32] + '%）');
+    });
+    finish(1, true, '耗时 ' + ms(t0) + '；' + rows.join('　'), false);
+  }).catch(function(e) { finish(1, false, '失败原因：' + e, false); });
+};
+
+window.t2 = function() {
+  var t0 = performance.now();
+  jsonp('https://push2.eastmoney.com/api/qt/stock/get?secid=1.000001&fields=f43,f57,f58,f170', 6000).then(function(d) {
+    var x = d && d.data;
+    if (!x) throw '返回为空';
+    finish(2, true, '耗时 ' + ms(t0) + '；' + x.f58 + '（' + x.f57 + '）最新价 ' + (x.f43 / 100).toFixed(2) + '，涨跌幅 ' + (x.f170 / 100).toFixed(2) + '%', false);
+  }).catch(function(e) { finish(2, false, '失败原因：' + e, false); });
+};
+
+window.t3 = function() {
+  var t0 = performance.now();
+  jsonp('https://push2.eastmoney.com/api/qt/clist/get?pn=1&pz=5&po=1&np=1&fltt=2&invt=2&fid=f62&fs=m:90+t:2&fields=f12,f14,f62', 6000).then(function(d) {
+    var diff = d && d.data && d.data.diff;
+    if (!diff || !diff.length) throw '返回为空';
+    var top = diff.slice(0, 5).map(function(x) { return x.f14 + ' +' + (x.f62 / 1e8).toFixed(1) + '亿'; });
+    finish(3, true, '耗时 ' + ms(t0) + '；今日主力净流入前5板块：' + top.join('　'), false);
+  }).catch(function(e) { finish(3, false, '失败原因：' + e, false); });
+};
+
+window.t4 = function() {
+  var t0 = performance.now();
+  jsonp('https://push2his.eastmoney.com/api/qt/stock/trends2/get?secid=1.600519&fields1=f1,f2,f3&fields2=f51,f53&iscr=0&ndays=1', 6000).then(function(d) {
+    var tr = d && d.data && d.data.trends;
+    if (!tr || !tr.length) throw '返回为空';
+    var first = tr[0].split(','), last = tr[tr.length - 1].split(',');
+    finish(4, true, '耗时 ' + ms(t0) + '；贵州茅台今日分时共 ' + tr.length + ' 个点，首点 ' + first[0] + ' ' + first[1] + '，末点 ' + last[0] + ' ' + last[1], false);
+  }).catch(function(e) { finish(4, false, '失败原因：' + e, false); });
+};
+
+window.t5 = function() {
+  var t0 = performance.now();
+  if (!window.fetch) { finish(5, false, '当前环境不支持 fetch', true); return; }
+  fetch('https://np-listapi.eastmoney.com/comm/web/getFastNewsList?client=web&biz=web_724&fastColumn=102&sortEnd=&pageSize=5', { mode: 'cors' })
+    .then(function(r) { if (!r.ok) throw 'HTTP ' + r.status; return r.json(); })
+    .then(function(j) {
+      var list = j && j.data && (j.data.fastNewsList || j.data.list);
+      if (!list || !list.length) throw '返回结构变化';
+      var s = list.slice(0, 2).map(function(x) { return '「' + String(x.title || x.showTitle || '').slice(0, 24) + '…」'; });
+      finish(5, true, '耗时 ' + ms(t0) + '；取到快讯 ' + list.length + ' 条，例：' + s.join(''), false);
+    })
+    .catch(function(e) { finish(5, false, '跨域受限或网络失败：' + e + '（file:// 本地打开时属正常，部署到域名后需复测）', true); });
+};
+
+t1(); t2(); t3(); t4(); t5();
+</script>
+</body>
+</html>
