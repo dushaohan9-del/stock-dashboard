@@ -99,8 +99,8 @@
 
   <div class="chart-row">
     <div class="card" style="flex:1.2">
-      <h2>板块主力资金榜</h2>
-      <div class="cap">行业板块主力净流入（亿元）· 红流入绿流出</div>
+      <h2>板块资金榜</h2>
+      <div class="cap">优先显示主力净流入（亿元）· 数据源受限时自动切换为板块涨跌幅</div>
       <div id="boardBox" class="chart-s"><div class="degrade">数据加载中…</div></div>
     </div>
     <div class="card">
@@ -224,23 +224,38 @@ function renderTrendChart(t){
 }
 function trendEmpty(){ var el=$('trendBox'); el.innerHTML='<div class="degrade">分时数据获取失败（接口偶发限制），下轮刷新自动重试</div>'; if(charts.trend){ charts.trend.dispose(); charts.trend=null; } }
 
-/* ===== 板块资金榜 ===== */
+/* ===== 板块榜（东财资金榜优先 · 腾讯行业涨跌榜降级）===== */
+var BK31 = [["pt01801120","食品饮料"],["pt01801730","电力设备"],["pt01801110","家用电器"],["pt01801080","电子"],["pt01801050","有色金属"],["pt01801150","医药生物"],["pt01801210","社会服务"],["pt01801770","通信"],["pt01801880","汽车"],["pt01801710","建筑材料"],["pt01801750","计算机"],["pt01801030","基础化工"],["pt01801780","银行"],["pt01801230","综合"],["pt01801980","美容护理"],["pt01801950","煤炭"],["pt01801960","石油石化"],["pt01801010","农林牧渔"],["pt01801160","公用事业"],["pt01801890","机械设备"],["pt01801040","钢铁"],["pt01801140","轻工制造"],["pt01801170","交通运输"],["pt01801720","建筑装饰"],["pt01801970","环保"],["pt01801180","房地产"],["pt01801200","商贸零售"],["pt01801790","非银金融"],["pt01801740","国防军工"],["pt01801130","纺织服饰"],["pt01801760","传媒"]];
+function renderBoard(names, vals, unit, title){
+  var isM=window.innerWidth<900;
+  if(!charts.board){ $('boardBox').innerHTML=''; charts.board=echarts.init($('boardBox')); }
+  charts.board.setOption({
+    animationDuration:600,
+    title:{text:title,left:'right',top:0,textStyle:{fontSize:11,color:'#98a1b3',fontWeight:'normal'}},
+    tooltip:{trigger:'axis',axisPointer:{type:'shadow'},formatter:function(ps){ var p=ps[0]; return p.name+'<br/>'+Number(p.value).toFixed(2)+' '+unit; }},
+    grid:{left:'2%',right:'12%',top:'8%',bottom:'3%',containLabel:true},
+    xAxis:{type:'value',axisLabel:{fontSize:10},splitLine:{lineStyle:{color:'#f0f2f7'}}},
+    yAxis:{type:'category',data:names,axisLabel:{fontSize:11}},
+    series:[{type:'bar',data:vals.map(function(v){return {value:v,itemStyle:{color:v>=0?'#d0342c':'#1e8e5a',borderRadius:3}};}),barMaxWidth:14,label:{show:true,position:'right',fontSize:10,formatter:function(p){return Number(p.value).toFixed(1);}}}]
+  },true);
+}
 function tickBoards(){
   qs('https://push2.eastmoney.com/api/qt/clist/get?pn=1&pz=10&po=1&np=1&fltt=2&invt=2&fid=f62&fs=m:90+t:2&fields=f14,f62,f3').then(function(d){
-    var diff=d&&d.data&&d.data.diff; if(!diff||!diff.length){ return; }
-    var names=[],vals=[],colors=[];
-    diff.forEach(function(x){ names.unshift(x.f14); vals.unshift(+((x.f62)/1e8).toFixed(2)); colors.unshift(x.f62>=0?'#d0342c':'#1e8e5a'); });
-    var isM=window.innerWidth<900;
-    if(!charts.board){ charts.board=echarts.init($('boardBox')); }
-    charts.board.setOption({
-      animationDuration:600,
-      tooltip:{trigger:'axis',axisPointer:{type:'shadow'},formatter:function(ps){ var p=ps[0]; return p.name+'<br/>主力净流入 '+Number(p.value).toFixed(2)+' 亿元'; }},
-      grid:{left:'2%',right:'12%',top:'3%',bottom:'3%',containLabel:true},
-      xAxis:{type:'value',axisLabel:{fontSize:10},splitLine:{lineStyle:{color:'#f0f2f7'}}},
-      yAxis:{type:'category',data:names,axisLabel:{fontSize:11}},
-      series:[{type:'bar',data:vals.map(function(v,i){return {value:v,itemStyle:{color:colors[i],borderRadius:3}};}),barMaxWidth:14,label:{show:true,position:'right',fontSize:10,formatter:function(p){return Number(p.value).toFixed(1);}}}]
-    },true);
-  }).catch(function(){ if(!charts.board){ $('boardBox').innerHTML='<div class="degrade">板块数据源受限（东财接口），手机或关闭代理可见</div>'; } });
+    var diff=d&&d.data&&d.data.diff; if(!diff||!diff.length){ throw 'empty'; }
+    var names=[],vals=[];
+    diff.forEach(function(x){ names.unshift(x.f14); vals.unshift(+((x.f62)/1e8).toFixed(2)); });
+    renderBoard(names, vals, '亿元', '主力净流入');
+  }).catch(function(){
+    loadScript('https://qt.gtimg.cn/q='+BK31.map(function(b){return b[0];}).join(',')).then(function(){
+      var arr=[];
+      BK31.forEach(function(b){ var v=window['v_'+b[0]]; if(v){ var a=v.split('~'); arr.push([b[1], +a[24]||0]); } });
+      if(!arr.length){ throw 'empty'; }
+      arr.sort(function(x,y){ return y[1]-x[1]; });
+      var top=arr.slice(0,5), bot=arr.slice(-5).reverse();
+      var merged=bot.concat(top);
+      renderBoard(merged.map(function(x){return x[0];}), merged.map(function(x){return +x[1].toFixed(2);}), '%', '板块涨跌幅');
+    }).catch(function(){ if(!charts.board){ $('boardBox').innerHTML='<div class="degrade">板块数据暂不可达，下轮自动重试</div>'; } });
+  });
 }
 
 /* ===== 市场宽度 ===== */
@@ -257,7 +272,21 @@ function tickBreadth(){
         data:[ {name:'上涨',value:up,itemStyle:{color:'#d0342c'}}, {name:'下跌',value:dn,itemStyle:{color:'#1e8e5a'}}, {name:'平盘',value:fl,itemStyle:{color:'#b9c2d0'}} ]}],
       graphic:[{type:'text',left:'center',top:'40%',style:{text:'涨家占比\n'+(tot?((up/tot)*100).toFixed(0):'-')+'%',textAlign:'center',fill:'#16233f',fontSize:isM?12:14,lineHeight:18}}]
     },true);
-  }).catch(function(){ if(!charts.breadth){ $('breadthBox').innerHTML='<div class="degrade">涨跌数据源受限（东财接口），手机或关闭代理可见</div>'; } });
+  }).catch(function(){
+    loadScript('https://qt.gtimg.cn/q='+BK31.map(function(b){return b[0];}).join(',')).then(function(){
+      var up=0,dn=0,fl=0;
+      BK31.forEach(function(b){ var v=window['v_'+b[0]]; if(!v) return; var z=+(v.split('~')[24]||0); if(z>0.005)up++; else if(z<-0.005)dn++; else fl++; });
+      if(!charts.breadth){ $('breadthBox').innerHTML=''; charts.breadth=echarts.init($('breadthBox')); }
+      var isM=window.innerWidth<900;
+      charts.breadth.setOption({
+        tooltip:{trigger:'item',formatter:function(p){return p.name+'：'+p.value+' 个板块';}},
+        legend:{bottom:0,left:'center',textStyle:{fontSize:11},itemWidth:12},
+        series:[{type:'pie',radius:['42%','66%'],center:['50%','44%'],avoidLabelOverlap:true,label:{show:true,formatter:'{c}',fontSize:11,color:'#fff',position:'inside'},labelLine:{show:false},
+          data:[ {name:'上涨板块',value:up,itemStyle:{color:'#d0342c'}}, {name:'下跌板块',value:dn,itemStyle:{color:'#1e8e5a'}}, {name:'平盘板块',value:fl,itemStyle:{color:'#b9c2d0'}} ]}],
+        graphic:[{type:'text',left:'center',top:'40%',style:{text:'行业板块口径\n'+(up+dn+fl)+'个',textAlign:'center',fill:'#16233f',fontSize:isM?11:13,lineHeight:17}}]
+      },true);
+    }).catch(function(){ if(!charts.breadth){ $('breadthBox').innerHTML='<div class="degrade">涨跌数据暂不可达，下轮自动重试</div>'; } });
+  });
 }
 
 /* ===== 自选列表（可折叠分组）===== */
