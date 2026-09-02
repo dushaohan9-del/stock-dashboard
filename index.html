@@ -61,7 +61,7 @@
   <div class="hero">
     <div>
       <h1>个人市场看板</h1>
-      <div class="sub">CPO · PCB · 科创芯片 · 创新能源 ｜ 数据来自腾讯/东财公开接口，仅供参考</div>
+      <div class="sub">自选盯盘 · 指数总览 · 板块资金 · 实时快讯 ｜ 数据来自腾讯/东财/新浪公开接口，仅供参考</div>
     </div>
     <div class="chips">
       <span class="chip closed" id="mktChip">状态检测中</span>
@@ -158,9 +158,10 @@ function tickIndices(){
 }
 
 /* ===== 分时图 ===== */
+function toEmSec(mcode){ return (mcode.indexOf('sh')===0?'1.':'0.')+mcode.slice(2); }
 function drawTrend(secid, name){
   curTrend=secid; curTrendName=name; $('trendTitle').textContent=name+' · 分时走势';
-  qs('https://push2.eastmoney.com/api/qt/stock/trends2/get?secid='+secid+'&fields1=f1,f2,f3,f4,f5,f6,f7&fields2=f51,f53,f54,f55,f56&iscr=0&ndays=1').then(function(d){
+  qs('https://push2his.eastmoney.com/api/qt/stock/trends2/get?secid='+toEmSec(secid)+'&fields1=f1,f2,f3,f4,f5,f6,f7&fields2=f51,f53,f54,f55,f56&iscr=0&ndays=1').then(function(d){
     var x=d&&d.data; if(!x||!x.trends||!x.trends.length){ trendEmpty(); return; }
     var pre=x.preClose||(+x.trends[0].split(',')[1]); var times=[],prices=[],vols=[],up=[],dn=[];
     x.trends.forEach(function(t){ var p=t.split(','); times.push(p[0].slice(11)); prices.push(+p[1]); vols.push(+p[4]||0); up.push(+p[2]); dn.push(+p[3]); });
@@ -182,7 +183,7 @@ function drawTrend(secid, name){
     },true);
   }).catch(trendEmpty);
 }
-function trendEmpty(){ if(!charts.trend){ charts.trend=echarts.init($('trendBox')); } charts.trend.clear(); }
+function trendEmpty(){ var el=$('trendBox'); el.innerHTML='<div class="degrade">分时数据获取失败（接口偶发限制），30秒后自动重试</div>'; if(charts.trend){ charts.trend.dispose(); charts.trend=null; } }
 
 /* ===== 板块资金榜 ===== */
 function tickBoards(){
@@ -264,7 +265,7 @@ function initGroups(){
 
 /* ===== 快讯（新浪滚动，JSONP）===== */
 function tickNews(){
-  loadScript('https://feed.mix.sina.com.cn/api/roll/get?pageid=153&lid=2516&k=&num=10&page=1&cb=feedJSON153&_='+Date.now()).catch(function(){});
+  loadScript('https://feed.mix.sina.com.cn/api/roll/get?pageid=153&lid=2516&k=&num=10&page=1&callback=feedJSON153&_='+Date.now()).catch(function(){});
 }
 window.feedJSON153 = function(data){
   try{
