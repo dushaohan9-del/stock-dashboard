@@ -127,6 +127,7 @@ var WATCH = {
   'CPO': [ ['300308','sz','中际旭创'], ['300394','sz','天孚通信'], ['300502','sz','新易盛'], ['688498','sh','源杰科技'] ],
   'PCB': [ ['600183','sh','生益科技'], ['002384','sz','东山精密'], ['002916','sz','深南电路'], ['002463','sz','沪电股份'], ['300476','sz','胜宏科技'] ]
 };
+var GROUP_BOARD = { 'CPO': ['pt02GN2211','共封装光模块(CPO)'], 'PCB': ['pt02101284','PCB概念'] };
 var INDICES = [ ['sh000001','上证指数'], ['sz399006','创业板指'], ['sh000688','科创50'], ['sh000300','沪深300'], ['sz399997','中证白酒'] ];
 INDICES[4] = ['sh000016','上证50'];
 var EM = { code:'18010433264402', ut:'bd1d9ddb04089700cf9c27f6f7426281' };
@@ -297,7 +298,7 @@ function grpOpen(g){ try{ var s=JSON.parse(localStorage.getItem('grpState')||'{}
 function setGrpOpen(g,v){ try{ var s=JSON.parse(localStorage.getItem('grpState')||'{}'); s[g]=!v; localStorage.setItem('grpState',JSON.stringify(s)); }catch(e){} }
 function tickWatch(){
   var codes=[]; Object.keys(WATCH).forEach(function(g){ WATCH[g].forEach(function(s){ codes.push((s[1]==='sh'?'1.':'0.')+s[0]); }); });
-  var t=qss('https://qt.gtimg.cn/q='+Object.keys(WATCH).map(function(g){ return WATCH[g].map(function(s){return s[1]+s[0];}).join(','); }).join(','));
+  var t=qss('https://qt.gtimg.cn/q='+Object.keys(WATCH).map(function(g){ return WATCH[g].map(function(s){return s[1]+s[0];}).join(','); }).join(',')+','+Object.keys(GROUP_BOARD).map(function(g){return GROUP_BOARD[g][0];}).join(','));
   var eb=qs('https://push2.eastmoney.com/api/qt/ulist.np/get?ut='+EM.ut+'&fltt=2&secids='+codes.join(',')+'&fields=f2,f3,f6,f8,f12,f62').catch(function(){ return null; });
   Promise.all([t,eb]).then(function(rs){
     if(!rs[0]){ return; }
@@ -307,10 +308,10 @@ function tickWatch(){
     Object.keys(WATCH).forEach(function(g){
       var list=WATCH[g];
       var wrap=document.createElement('div'); wrap.className='grp'+(grpOpen(g)?'':' closed');
-      var sum=0; list.forEach(function(s){ var v=window['v_'+s[1]+s[0]]; if(v){ sum+=+(v.split('~')[32]); } });
-      var avg=list.length?sum/list.length:0;
+      var bd=GROUP_BOARD[g], bdChg=NaN;
+      if(bd){ var bv=window['v_'+bd[0]]; if(bv){ bdChg=+(bv.split('~')[32]); } }
       var hd=document.createElement('div'); hd.className='grp-hd';
-      hd.innerHTML='<span class="ar">▶</span>'+g+'<span class="cnt">（'+list.length+'）</span><span class="gavg '+cls(avg)+'">均 '+sgn(avg)+'%</span>';
+      hd.innerHTML='<span class="ar">▶</span>'+g+'<span class="cnt">（'+list.length+'）</span><span class="gavg '+(isNaN(bdChg)?'fl':cls(bdChg))+'" title="'+(bd?bd[1]:'')+' 板块今日涨跌幅'+'">'+(isNaN(bdChg)?'板块 --':sgn(bdChg)+'%')+'</span>';
       var body=document.createElement('div'); body.className='grp-body';
       var rowsHtml='<table><thead><tr><th>名称/代码</th><th>现价</th><th>涨跌幅</th><th>成交额</th><th>换手率</th><th>主力净流入</th></tr></thead><tbody>';
       list.forEach(function(s){
