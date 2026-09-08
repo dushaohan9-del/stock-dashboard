@@ -87,7 +87,7 @@
 
   <div class="card" id="newsCard">
     <h2>财经快讯</h2>
-    <div class="cap">新浪滚动 · 命中自选股/CPO/PCB 关键词自动置顶高亮 · 交易时段每1分钟刷新</div>
+    <div class="cap">华尔街见闻快讯为主源 · 命中自选股/CPO/PCB 关键词自动置顶高亮 · 交易时段每1分钟刷新</div>
     <div class="news-wrap"><ul class="news" id="newsList"><li><span class="tm">--:--</span>加载中…</li></ul></div>
   </div>
 
@@ -341,38 +341,55 @@ function tickWatch(){
 }
 function qss(url){ return loadScript(url).then(function(){ return true; }).catch(function(){ return false; }); }
 
-/* ===== 快讯（新浪滚动，JSONP · 自选关键词命中置顶）===== */
+/* ===== 快讯（华尔街见闻主源 · 新浪备用 · 自选关键词命中置顶）===== */
 function newsKeywords(){
   var ks=['CPO','PCB','光模块','算力','存储','半导体','液冷','覆铜板'];
   Object.keys(WATCH).forEach(function(g){ ks.push(g); WATCH[g].forEach(function(s){ ks.push(s[2]); }); });
   return ks;
 }
 function tickNews(){
+  if(window.fetch){
+    fetch('https://api-one.wallstcn.com/apiv1/content/lives?channel=global-channel&limit=20',{mode:'cors'})
+      .then(function(r){ if(!r.ok) throw new Error('http'); return r.json(); })
+      .then(function(j){
+        var items=(j&&j.data&&j.data.items)||[];
+        if(!items.length) throw new Error('empty');
+        renderNews(items.map(function(x){ return { ctime:+x.display_time||Math.floor(Date.now()/1000), title:x.title||String(x.content_text||'').replace(/\s+/g,' ').slice(0,60), url:x.uri||('https://wallstreetcn.com/livenews/'+x.id) }; }));
+      })
+      .catch(function(){ sinaNews(); });
+  } else sinaNews();
+}
+function sinaNews(){
   loadScript('https://feed.mix.sina.com.cn/api/roll/get?pageid=153&lid=2516&k=&num=20&page=1&callback=feedJSON153&_='+Date.now()).catch(function(){});
 }
 window.feedJSON153 = function(data){
   try{
     var list=(data&&data.result&&data.result.list)||[]; if(!list.length) return;
+    renderNews(list.map(function(it){ return { ctime:+it.ctime||+it.create_time||0, title:String(it.title||'').replace(/<[^>]+>/g,''), url:it.url||'' }; }));
+  }catch(e){}
+};
+function renderNews(list){
+  try{
     var ks=newsKeywords();
     var hits=[], plain=[];
-    list.forEach(function(it){
-      var title=String(it.title||it.titlelink||'').replace(/<[^>]+>/g,'');
-      var k=''; for(var i=0;i<ks.length;i++){ if(title.indexOf(ks[i])>=0){ k=ks[i]; break; } }
-      if(k) hits.push({it:it,title:title,k:k}); else plain.push({it:it,title:title,k:''});
+    list.forEach(function(x){
+      var k=''; for(var i=0;i<ks.length;i++){ if(String(x.title).indexOf(ks[i])>=0){ k=ks[i]; break; } }
+      if(k) hits.push({ ctime:x.ctime, title:x.title, url:x.url, k:k }); else plain.push({ ctime:x.ctime, title:x.title, url:x.url, k:'' });
     });
     var ul=$('newsList'); ul.innerHTML='';
+    var now=new Date();
     hits.concat(plain).slice(0,12).forEach(function(x){
-      var it=x.it; var now=new Date(); var d=new Date((+it.ctime||it.create_time)*1000);
+      var d=new Date((+x.ctime)*1000);
       function z(n){return (n<10?'0':'')+n;}
       var today=d.getDate()===now.getDate()&&d.getMonth()===now.getMonth();
       var tm=z(d.getHours())+':'+z(d.getMinutes())+(today?'':' ·'+z(d.getMonth()+1)+'-'+z(d.getDate()));
       var li=document.createElement('li'); li.className='fadein'+(x.k?' hit':'');
       var badge=x.k?'<span class="tag2">'+x.k+'</span>':'';
-      li.innerHTML='<span class="tm">'+tm+'</span><span style="flex:1">'+badge+'<a href="'+(it.url||'javascript:void(0)')+'" target="_blank" rel="noopener">'+x.title.replace(/</g,'&lt;')+'</a></span>';
+      li.innerHTML='<span class="tm">'+tm+'</span><span style="flex:1">'+badge+'<a href="'+(x.url||'javascript:void(0)')+'" target="_blank" rel="noopener">'+String(x.title).replace(/</g,'&lt;')+'</a></span>';
       ul.appendChild(li);
     });
   }catch(e){}
-};
+}
 
 /* ===== 调度 ===== */
 function applySchedule(){
