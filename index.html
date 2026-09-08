@@ -57,7 +57,10 @@
   tr:hover td { background:#f7fafd; }
   td.nm { font-weight:600; } td.nm small { color:#98a1b3; font-weight:400; margin-left:6px; font-size:11px; }
   .news { list-style:none; }
+  .news-wrap { max-height:212px; overflow-y:auto; -webkit-overflow-scrolling:touch; }
   .news li { padding:9px 2px; border-bottom:1px dashed #eef1f6; font-size:13px; line-height:1.6; display:flex; gap:10px; }
+  .news li.hit { background:#fff8ec; border-left:3px solid #d9a441; padding-left:9px; }
+  .news li.hit .tag2 { display:inline-block; background:#d9a441; color:#fff; font-size:10px; border-radius:4px; padding:0 5px; margin-right:6px; vertical-align:1px; }
   .news .tm { color:#98a1b3; font-size:12px; white-space:nowrap; padding-top:2px; font-variant-numeric:tabular-nums; }
   .news li a { color:#2c3550; text-decoration:none; } .news li a:hover { color:#28477e; }
   .fadein { animation:rise .45s ease both; }
@@ -80,6 +83,12 @@
       <span class="chip" id="cntChip">刷新 --</span>
       <span class="chip" id="updChip">更新于 --:--:--</span>
     </div>
+  </div>
+
+  <div class="card" id="newsCard">
+    <h2>财经快讯</h2>
+    <div class="cap">新浪滚动 · 命中自选股/CPO/PCB 关键词自动置顶高亮 · 交易时段每1分钟刷新</div>
+    <div class="news-wrap"><ul class="news" id="newsList"><li><span class="tm">--:--</span>加载中…</li></ul></div>
   </div>
 
   <div class="idx-row" id="idxRow"></div>
@@ -108,12 +117,6 @@
       <div class="cap">全A股涨跌分布</div>
       <div id="breadthBox" class="chart-s" style="height:300px"><div class="degrade">数据加载中…</div></div>
     </div>
-  </div>
-
-  <div class="card">
-    <h2>财经快讯</h2>
-    <div class="cap">新浪财经滚动新闻 · 约每5分钟刷新 · 点击新窗口打开</div>
-    <ul class="news" id="newsList"><li><span class="tm">--:--</span>加载中…</li></ul>
   </div>
 
   <div class="foot">行情快照：交易时段 30 秒轮询，休市时段 5 分钟。东方财富个股/板块数据为公开接口，可能有秒级至分钟级延迟。<br>
@@ -338,18 +341,34 @@ function tickWatch(){
 }
 function qss(url){ return loadScript(url).then(function(){ return true; }).catch(function(){ return false; }); }
 
-/* ===== 快讯（新浪滚动，JSONP）===== */
+/* ===== 快讯（新浪滚动，JSONP · 自选关键词命中置顶）===== */
+function newsKeywords(){
+  var ks=['CPO','PCB','光模块','算力','存储','半导体','液冷','覆铜板'];
+  Object.keys(WATCH).forEach(function(g){ ks.push(g); WATCH[g].forEach(function(s){ ks.push(s[2]); }); });
+  return ks;
+}
 function tickNews(){
-  loadScript('https://feed.mix.sina.com.cn/api/roll/get?pageid=153&lid=2516&k=&num=10&page=1&callback=feedJSON153&_='+Date.now()).catch(function(){});
+  loadScript('https://feed.mix.sina.com.cn/api/roll/get?pageid=153&lid=2516&k=&num=20&page=1&callback=feedJSON153&_='+Date.now()).catch(function(){});
 }
 window.feedJSON153 = function(data){
   try{
     var list=(data&&data.result&&data.result.list)||[]; if(!list.length) return;
+    var ks=newsKeywords();
+    var hits=[], plain=[];
+    list.forEach(function(it){
+      var title=String(it.title||it.titlelink||'').replace(/<[^>]+>/g,'');
+      var k=''; for(var i=0;i<ks.length;i++){ if(title.indexOf(ks[i])>=0){ k=ks[i]; break; } }
+      if(k) hits.push({it:it,title:title,k:k}); else plain.push({it:it,title:title,k:''});
+    });
     var ul=$('newsList'); ul.innerHTML='';
-    list.slice(0,8).forEach(function(it){
-      var d=new Date((+it.ctime||it.create_time)*1000); function z(n){return (n<10?'0':'')+n;}
-      var li=document.createElement('li'); li.className='fadein';
-      li.innerHTML='<span class="tm">'+z(d.getMonth()+1)+'-'+z(d.getDate())+' '+z(d.getHours())+':'+z(d.getMinutes())+'</span><a href="'+(it.url||'javascript:void(0)')+'" target="_blank" rel="noopener">'+(it.title||'').replace(/</g,'&lt;')+'</a>';
+    hits.concat(plain).slice(0,12).forEach(function(x){
+      var it=x.it; var now=new Date(); var d=new Date((+it.ctime||it.create_time)*1000);
+      function z(n){return (n<10?'0':'')+n;}
+      var today=d.getDate()===now.getDate()&&d.getMonth()===now.getMonth();
+      var tm=z(d.getHours())+':'+z(d.getMinutes())+(today?'':' ·'+z(d.getMonth()+1)+'-'+z(d.getDate()));
+      var li=document.createElement('li'); li.className='fadein'+(x.k?' hit':'');
+      var badge=x.k?'<span class="tag2">'+x.k+'</span>':'';
+      li.innerHTML='<span class="tm">'+tm+'</span><span style="flex:1">'+badge+'<a href="'+(it.url||'javascript:void(0)')+'" target="_blank" rel="noopener">'+x.title.replace(/</g,'&lt;')+'</a></span>';
       ul.appendChild(li);
     });
   }catch(e){}
@@ -364,7 +383,7 @@ function applySchedule(){
   if(applySchedule._t) clearInterval(applySchedule._t);
   applySchedule._t=setInterval(allTick,step);
   if(newsTimer) clearInterval(newsTimer);
-  newsTimer=setInterval(tickNews,300000);
+  newsTimer=setInterval(tickNews,trading?60000:300000);
 }
 function allTick(){
   pollCount++; $('cntChip').textContent='刷新 #'+pollCount;
