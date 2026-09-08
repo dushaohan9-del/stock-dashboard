@@ -294,8 +294,8 @@ function tickBreadth(){
 }
 
 /* ===== 自选列表（可折叠分组）===== */
-function grpOpen(g){ try{ var s=JSON.parse(localStorage.getItem('grpState')||'{}'); return s[g]!==false; }catch(e){ return true; } }
-function setGrpOpen(g,v){ try{ var s=JSON.parse(localStorage.getItem('grpState')||'{}'); s[g]=!v; localStorage.setItem('grpState',JSON.stringify(s)); }catch(e){} }
+function grpOpen(g){ try{ var s=JSON.parse(localStorage.getItem('grpOpenState')||'{}'); return s[g]===true; }catch(e){ return false; } }
+function setGrpOpen(g,v){ try{ var s=JSON.parse(localStorage.getItem('grpOpenState')||'{}'); s[g]=!!v; localStorage.setItem('grpOpenState',JSON.stringify(s)); }catch(e){} }
 function tickWatch(){
   var codes=[]; Object.keys(WATCH).forEach(function(g){ WATCH[g].forEach(function(s){ codes.push((s[1]==='sh'?'1.':'0.')+s[0]); }); });
   var t=qss('https://qt.gtimg.cn/q='+Object.keys(WATCH).map(function(g){ return WATCH[g].map(function(s){return s[1]+s[0];}).join(','); }).join(',')+','+Object.keys(GROUP_BOARD).map(function(g){return GROUP_BOARD[g][0];}).join(','));
@@ -307,7 +307,7 @@ function tickWatch(){
     var box=$('wlGroups'); box.innerHTML='';
     Object.keys(WATCH).forEach(function(g){
       var list=WATCH[g];
-      var wrap=document.createElement('div'); wrap.className='grp'+(grpOpen(g)?'':' closed');
+      var wrap=document.createElement('div'); wrap.className='grp'+(grpOpen(g)?'':' closed'); wrap.setAttribute('data-g',g);
       var bd=GROUP_BOARD[g], bdChg=NaN;
       if(bd){ var bv=window['v_'+bd[0]]; if(bv){ bdChg=+(bv.split('~')[32]); } }
       var hd=document.createElement('div'); hd.className='grp-hd';
@@ -330,7 +330,7 @@ function tickWatch(){
       });
       rowsHtml+='</tbody></table>';
       body.innerHTML=rowsHtml;
-      hd.onclick=function(){ wrap.classList.toggle('closed'); setGrpOpen(g, wrap.classList.contains('closed')); };
+      hd.onclick=function(){ wrap.classList.toggle('closed'); setGrpOpen(g, !wrap.classList.contains('closed')); };
       wrap.appendChild(hd); wrap.appendChild(body); box.appendChild(wrap);
     });
     box.querySelectorAll('tr[data-m]').forEach(function(tr){ tr.onclick=function(){ drawTrend(tr.getAttribute('data-m'), tr.getAttribute('data-n')); }; });
